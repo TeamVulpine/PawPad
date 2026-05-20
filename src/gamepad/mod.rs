@@ -1,6 +1,8 @@
 use std::time::Instant;
 
-use crate::gamepad::{axis::GamepadAxis, button::GamepadButton, pointer::GamepadPointer, sensor::GamepadSensor};
+use crate::gamepad::{
+    axis::GamepadAxis, button::GamepadButton, pointer::GamepadPointer, sensor::GamepadSensor,
+};
 
 pub mod axis;
 pub mod button;
