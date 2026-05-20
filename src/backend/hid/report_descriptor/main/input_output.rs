@@ -1,60 +1,53 @@
-#[repr(u8)]
+use crate::backend::hid::report_descriptor::parse_unsigned;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataKind {
     Data,
     Constant,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArrayKind {
     Array,
     Variable,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PositionKind {
     Absolute,
     Relative,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WrapKind {
     NoWrap,
     Wrap,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinearKind {
     Linear,
     NonLinear,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PreferredKind {
     PreferredState,
     NoPreferred,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NullKind {
     NoNull,
     NullState,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VolatileKind {
     NonVolatile,
     Volatile,
 }
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BufferKind {
     BitField,
@@ -75,18 +68,6 @@ pub struct InputOutput {
 }
 
 impl InputOutput {
-    fn get_raw_flags(bytes: &[u8]) -> u16 {
-        if bytes.len() == 1 {
-            return bytes[0] as u16;
-        }
-
-        if bytes.len() == 0 {
-            return 0;
-        }
-
-        return u16::from_be_bytes(*(bytes[..2]).as_array().unwrap());
-    }
-
     fn from_u16(value: u16) -> Self {
         return Self {
             data_kind: if value & (1 << 0) == 0 {
@@ -146,7 +127,7 @@ impl InputOutput {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        return Self::from_u16(Self::get_raw_flags(bytes));
+        return Self::from_u16(parse_unsigned(bytes) as u16);
     }
 }
 

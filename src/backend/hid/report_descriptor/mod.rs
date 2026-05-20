@@ -56,6 +56,37 @@ impl<'a> HidReportDescriptorParser<'a> {
     }
 }
 
+fn parse_u8(bytes: &[u8]) -> u8 {
+    if bytes.len() == 0 {
+        return 0;
+    }
+    return bytes[0];
+}
+
+fn parse_u16(bytes: &[u8]) -> u16 {
+    if bytes.len() == 0 {
+        return 0;
+    }
+
+    if bytes.len() == 1 {
+        return bytes[0] as u16;
+    }
+
+    return u16::from_be_bytes(*(bytes[..2]).as_array().unwrap());
+}
+
+fn parse_unsigned(bytes: &[u8]) -> u32 {
+    let mut value = 0;
+    let mut index = 0;
+
+    for byte in bytes {
+        value |= (*byte as u32) << index;
+        index += 8;
+    }
+
+    return value;
+}
+
 impl ReportDescriptorCode {
     fn parse(reader: &mut HidReportDescriptorParser) -> Option<Self> {
         let first_byte = reader.next()?;

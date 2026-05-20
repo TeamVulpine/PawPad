@@ -1,6 +1,8 @@
+use crate::backend::hid::report_descriptor::parse_unsigned;
+
 #[derive(Debug)]
 pub enum ReportDescriptorCodeLocal {
-    Usage,
+    Usage(u32),
     UsageMinimum,
     UsageMaximum,
     DesignatorIndex,
@@ -16,7 +18,7 @@ pub enum ReportDescriptorCodeLocal {
 impl ReportDescriptorCodeLocal {
     pub fn from_tag(tag: u8, bytes: &[u8]) -> Self {
         match tag {
-            0 => Self::Usage,
+            0 => Self::Usage(parse_unsigned(bytes)),
             1 => Self::UsageMinimum,
             2 => Self::UsageMaximum,
             3 => Self::DesignatorIndex,

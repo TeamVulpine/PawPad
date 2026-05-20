@@ -1,3 +1,5 @@
+use crate::backend::hid::report_descriptor::parse_unsigned;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Collection {
     Physical,
@@ -29,6 +31,6 @@ impl Collection {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        return Self::from_raw(bytes.get(0).cloned().unwrap_or(0));
+        return Self::from_raw(parse_unsigned(bytes) as u8);
     }
 }
