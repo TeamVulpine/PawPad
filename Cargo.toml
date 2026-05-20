@@ -1,0 +1,13 @@
+[package]
+name = "pawpad"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hidapi = "2.6.6"
+serde.version = "1.0.228"
+serde.optional = true
+serde.features = ["derive"]
+
+[features]
+serde = ["dep:serde"]
