@@ -7,7 +7,7 @@ use crate::backend::evdev::{EvdevBackend, EvdevBackendError};
 use crate::{
     backend::hid::{HidBackend, HidBackendError},
     gamepad::GamepadEvent,
-    mapping::{BakedGamepadMappings, GamepadMappings, PlatformMappings},
+    mapping::BakedGamepadMappings,
 };
 
 #[cfg(target_os = "linux")]

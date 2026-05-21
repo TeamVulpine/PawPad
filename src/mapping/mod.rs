@@ -16,7 +16,7 @@ pub struct DeviceMappings {
     #[cfg_attr(feature = "serde", serde(default))]
     axes: HashMap<u16, GamepadAxis>,
     #[cfg_attr(feature = "serde", serde(default))]
-    hat: u8,
+    hat: Option<u8>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -96,7 +96,9 @@ impl GamepadMappings {
             for (index, axis) in &mappings.axes {
                 axes.insert((Transport::Bluetooth, *id, *index), *axis);
             }
-            hats.insert((Transport::Bluetooth, *id), mappings.hat);
+            if let Some(hat) = mappings.hat {
+                hats.insert((Transport::Bluetooth, *id), hat);
+            }
         }
 
         for (id, mappings) in &platform.usb {
@@ -106,7 +108,9 @@ impl GamepadMappings {
             for (index, axis) in &mappings.axes {
                 axes.insert((Transport::Usb, *id, *index), *axis);
             }
-            hats.insert((Transport::Usb, *id), mappings.hat);
+            if let Some(hat) = mappings.hat {
+                hats.insert((Transport::Usb, *id), hat);
+            }
         }
 
         return BakedGamepadMappings {

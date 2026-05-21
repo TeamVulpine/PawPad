@@ -14,7 +14,7 @@ impl GamepadAxis {
     pub(crate) fn normalize(&self, value: f32) -> f32 {
         return match self {
             Self::LeftX | Self::LeftY | Self::RightX | Self::RightY => value * 2. - 1.,
-            Self::LeftTrigger | Self::RightTrigger => value
+            Self::LeftTrigger | Self::RightTrigger => value,
         };
     }
 }
