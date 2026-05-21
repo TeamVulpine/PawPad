@@ -7,23 +7,24 @@ use std::{
     time::SystemTime,
 };
 
-use evdev::{AbsoluteAxisCode, BusType, Device, EventType, KeyCode};
+use evdev::{AbsoluteAxisCode, Device, EventType, InputId, KeyCode};
 use pawkit_crockford::Ulid;
 use thiserror::Error;
+use uuid::Uuid;
 
 use crate::{
-    gamepad::{GamepadEvent, GamepadEventKind, GamepadId, button::GamepadButton},
-    mapping::{BakedGamepadMappings, Transport, device_id::DeviceId},
+    gamepad::{GamepadEvent, GamepadEventKind, GamepadId, button::{self, GamepadButton}},
+    mapping::{BakedGamepadMappings, hat::{HatButton, HatDescriptor, HatIndex}},
 };
 
 struct MappedDevice {
     device: Device,
-    transport: Transport,
-    device_id: DeviceId,
+    path: PathBuf,
+    device_id: Uuid,
     keycode_mapping: HashMap<KeyCode, u16>,
     axis_mapping: HashMap<AbsoluteAxisCode, (u16, RangeInclusive<f32>)>,
-    hatx: Option<GamepadButton>,
-    haty: Option<GamepadButton>,
+    hatx: [Option<GamepadButton>; 4],
+    haty: [Option<GamepadButton>; 4],
 }
 
 pub struct EvdevBackend {
@@ -90,6 +91,29 @@ fn build_axis_mapping(
     }
 
     return Ok(map);
+}
+
+fn get_uuid(input_id: InputId) -> Uuid {
+    let bus = (u32::from(input_id.bus_type().0)).to_be();
+    let vendor = input_id.vendor().to_be();
+    let product = input_id.product().to_be();
+    let version = input_id.version().to_be();
+
+    return Uuid::from_fields(
+        bus,
+        vendor,
+        0,
+        &[
+            (product >> 8) as u8,
+            product as u8,
+            0,
+            0,
+            (version >> 8) as u8,
+            version as u8,
+            0,
+            0,
+        ],
+    );
 }
 
 impl EvdevBackend {
@@ -169,22 +193,7 @@ impl EvdevBackend {
                 continue;
             };
 
-            let id = device.input_id();
-
-            let device_id = DeviceId {
-                vendor: id.vendor(),
-                product: id.product(),
-                version: id.version(),
-            };
-
-            let transport = match id.bus_type() {
-                BusType::BUS_USB => Transport::Usb,
-                BusType::BUS_BLUETOOTH => Transport::Bluetooth,
-                it => panic!(
-                    "Unsupported transport {:?}. Open an issue at https://github.com/TeamVulpine/PawPad/",
-                    it
-                ),
-            };
+            let uuid = get_uuid(device.input_id());
 
             let id = Ulid::new();
 
@@ -192,10 +201,10 @@ impl EvdevBackend {
                 keycode_mapping: build_keycode_mapping(&device),
                 axis_mapping: build_axis_mapping(&device)?,
                 device,
-                device_id,
-                transport,
-                hatx: None,
-                haty: None,
+                device_id: uuid,
+                path: file.path(),
+                hatx: [None; 4],
+                haty: [None; 4],
             };
 
             self.devices.insert(id, mapped);
@@ -204,9 +213,11 @@ impl EvdevBackend {
             events.push(GamepadEvent {
                 id: GamepadId(id),
                 timestamp: SystemTime::now(),
-                kind: GamepadEventKind::Connected(device_id, transport),
+                kind: GamepadEventKind::Connected(uuid),
             });
         }
+
+        let mut devices_to_remove = Vec::new();
 
         for (id, device) in &mut self.devices {
             // TODO: Figure out how to merge events
@@ -225,21 +236,13 @@ impl EvdevBackend {
 
                                 let pressed = ev.value() != 0;
 
-                                if let Some(button) = mappings.get_button(
-                                    device.transport,
-                                    device.device_id,
-                                    scancode,
-                                ) {
+                                if let Some(button) =
+                                    mappings.get_button(device.device_id, scancode)
+                                {
                                     events.push(GamepadEvent {
                                         id: GamepadId(*id),
                                         timestamp: ev.timestamp(),
                                         kind: GamepadEventKind::ButtonChanged(button, pressed),
-                                    });
-                                } else {
-                                    events.push(GamepadEvent {
-                                        id: GamepadId(*id),
-                                        timestamp: ev.timestamp(),
-                                        kind: GamepadEventKind::UnknwonButtonChanged(scancode, pressed),
                                     });
                                 }
                             }
@@ -249,74 +252,128 @@ impl EvdevBackend {
 
                                 let mut was_hat = false;
 
-                                if let Some(hat) = mappings.get_hat(device.transport, device.device_id) {
-                                    let hatx = AbsoluteAxisCode(AbsoluteAxisCode::ABS_HAT0X.0 + hat as u16 * 2);
-                                    let haty = AbsoluteAxisCode(hatx.0 + 1);
+                                let mut handle_hat = |x: AbsoluteAxisCode, y: AbsoluteAxisCode, i: HatIndex| {
+                                    let value = ev.value();
 
-                                    if code == hatx {
-                                        let value = ev.value();
+                                    let hat_index = if code == x {
+                                        &mut device.hatx
+                                    } else if code == y {
+                                        &mut device.haty
+                                    } else {
+                                        return;
+                                    };
 
-                                        if let Some(hat) = device.hatx {
-                                            events.push(GamepadEvent {
-                                                id: GamepadId(*id),
-                                                timestamp: ev.timestamp(),
-                                                kind: GamepadEventKind::ButtonChanged(hat, false),
-                                            });
-                                        }
-
-                                        let value = if value == -1 {
-                                            Some(GamepadButton::DPadLeft)
-                                        } else if value == 1 {
-                                            Some(GamepadButton::DPadRight)
-                                        } else {
-                                            None
-                                        };
-                                        
-                                        if let Some(hat) = value {
-                                            events.push(GamepadEvent {
-                                                id: GamepadId(*id),
-                                                timestamp: ev.timestamp(),
-                                                kind: GamepadEventKind::ButtonChanged(hat, true),
-                                            });
-                                        }
-
-                                        device.hatx = value;
-
-                                        was_hat = true;
+                                    was_hat = true;
+                                    
+                                    if let Some(button) = hat_index[i.to_index()] {
+                                        events.push(GamepadEvent {
+                                            id: GamepadId(*id),
+                                            timestamp: ev.timestamp(),
+                                            kind: GamepadEventKind::ButtonChanged(button, false),
+                                        });
                                     }
+                                    
+                                    let button = if code == y && value == -1 {
+                                        HatButton::One
+                                    } else if code == y && value == 1 {
+                                        HatButton::Four
+                                    } else if code == x && value == -1 {
+                                        HatButton::Eight
+                                    } else if code == x && value == 1 {
+                                        HatButton::Two
+                                    } else {
+                                        hat_index[i.to_index()] = None;
+                                        return;
+                                    };
 
-                                    if code == haty {
-                                        let value = ev.value();
+                                    let descriptor = HatDescriptor(i, button);
 
-                                        if let Some(hat) = device.haty {
-                                            events.push(GamepadEvent {
-                                                id: GamepadId(*id),
-                                                timestamp: ev.timestamp(),
-                                                kind: GamepadEventKind::ButtonChanged(hat, false),
-                                            });
-                                        }
+                                    if let Some(button) = mappings.get_hat(device.device_id, descriptor) {
+                                        events.push(GamepadEvent {
+                                            id: GamepadId(*id),
+                                            timestamp: ev.timestamp(),
+                                            kind: GamepadEventKind::ButtonChanged(button, true),
+                                        });
 
-                                        let value = if value == -1 {
-                                            Some(GamepadButton::DPadUp)
-                                        } else if value == 1 {
-                                            Some(GamepadButton::DPadDown)
-                                        } else {
-                                            None
-                                        };
-                                        
-                                        if let Some(hat) = value {
-                                            events.push(GamepadEvent {
-                                                id: GamepadId(*id),
-                                                timestamp: ev.timestamp(),
-                                                kind: GamepadEventKind::ButtonChanged(hat, true),
-                                            });
-                                        }
-
-                                        device.haty = value;
-
-                                        was_hat = true;
+                                        hat_index[i.to_index()] = Some(button);
                                     }
-                                }
+                                };
+
+                                handle_hat(AbsoluteAxisCode::ABS_HAT0X, AbsoluteAxisCode::ABS_HAT0Y, HatIndex::Zero);
+                                handle_hat(AbsoluteAxisCode::ABS_HAT1X, AbsoluteAxisCode::ABS_HAT1Y, HatIndex::One);
+                                handle_hat(AbsoluteAxisCode::ABS_HAT2X, AbsoluteAxisCode::ABS_HAT2Y, HatIndex::Two);
+                                handle_hat(AbsoluteAxisCode::ABS_HAT3X, AbsoluteAxisCode::ABS_HAT3Y, HatIndex::Three);
+
+                                // if let Some(hat) = mappings.get_hat(device.device_id) {
+                                //     let hatx = AbsoluteAxisCode(
+                                //         AbsoluteAxisCode::ABS_HAT0X.0 + hat as u16 * 2,
+                                //     );
+                                //     let haty = AbsoluteAxisCode(hatx.0 + 1);
+
+                                //     if code == hatx {
+                                //         let value = ev.value();
+
+                                //         if let Some(hat) = device.hatx {
+                                //             events.push(GamepadEvent {
+                                //                 id: GamepadId(*id),
+                                //                 timestamp: ev.timestamp(),
+                                //                 kind: GamepadEventKind::ButtonChanged(hat, false),
+                                //             });
+                                //         }
+
+                                //         let value = if value == -1 {
+                                //             Some(GamepadButton::DPadLeft)
+                                //         } else if value == 1 {
+                                //             Some(GamepadButton::DPadRight)
+                                //         } else {
+                                //             None
+                                //         };
+
+                                //         if let Some(hat) = value {
+                                //             events.push(GamepadEvent {
+                                //                 id: GamepadId(*id),
+                                //                 timestamp: ev.timestamp(),
+                                //                 kind: GamepadEventKind::ButtonChanged(hat, true),
+                                //             });
+                                //         }
+
+                                //         device.hatx = value;
+
+                                //         was_hat = true;
+                                //     }
+
+                                //     if code == haty {
+                                //         let value = ev.value();
+
+                                //         if let Some(hat) = device.haty {
+                                //             events.push(GamepadEvent {
+                                //                 id: GamepadId(*id),
+                                //                 timestamp: ev.timestamp(),
+                                //                 kind: GamepadEventKind::ButtonChanged(hat, false),
+                                //             });
+                                //         }
+
+                                //         let value = if value == -1 {
+                                //             Some(GamepadButton::DPadUp)
+                                //         } else if value == 1 {
+                                //             Some(GamepadButton::DPadDown)
+                                //         } else {
+                                //             None
+                                //         };
+
+                                //         if let Some(hat) = value {
+                                //             events.push(GamepadEvent {
+                                //                 id: GamepadId(*id),
+                                //                 timestamp: ev.timestamp(),
+                                //                 kind: GamepadEventKind::ButtonChanged(hat, true),
+                                //             });
+                                //         }
+
+                                //         device.haty = value;
+
+                                //         was_hat = true;
+                                //     }
+                                // }
 
                                 let Some((scancode, range)) =
                                     device.axis_mapping.get(&code).cloned()
@@ -329,24 +386,13 @@ impl EvdevBackend {
 
                                 let value = (ev.value() as f32 - min) / (max - min);
 
-                                if let Some(axis) =
-                                    mappings.get_axis(device.transport, device.device_id, scancode)
-                                {
+                                if let Some(axis) = mappings.get_axis(device.device_id, scancode) {
                                     events.push(GamepadEvent {
                                         id: GamepadId(*id),
                                         timestamp: ev.timestamp(),
                                         kind: GamepadEventKind::AxisMoved(
                                             axis,
                                             axis.normalize(value),
-                                        ),
-                                    });
-                                } else if !was_hat {
-                                    events.push(GamepadEvent {
-                                        id: GamepadId(*id),
-                                        timestamp: ev.timestamp(),
-                                        kind: GamepadEventKind::UnknownAxisMoved(
-                                            scancode,
-                                            value,
                                         ),
                                     });
                                 }
@@ -357,8 +403,19 @@ impl EvdevBackend {
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
                 Err(e) => {
-                    panic!("{e}");
+                    events.push(GamepadEvent {
+                        id: GamepadId(*id),
+                        timestamp: SystemTime::now(),
+                        kind: GamepadEventKind::Disconnected
+                    });
+                    devices_to_remove.push(*id);
                 }
+            }
+        }
+
+        for id in devices_to_remove {
+            if let Some(device) = self.devices.remove(&id) {
+                self.device_paths.remove(&device.path);
             }
         }
 

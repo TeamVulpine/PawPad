@@ -1,12 +1,10 @@
 use std::time::SystemTime;
 
 use pawkit_crockford::Ulid;
+use uuid::Uuid;
 
-use crate::{
-    gamepad::{
-        axis::GamepadAxis, button::GamepadButton, pointer::GamepadPointer, sensor::GamepadSensor,
-    },
-    mapping::{Transport, device_id::DeviceId},
+use crate::gamepad::{
+    axis::GamepadAxis, button::GamepadButton, pointer::GamepadPointer, sensor::GamepadSensor,
 };
 
 pub mod axis;
@@ -23,7 +21,7 @@ pub struct GamepadId(pub(crate) Ulid);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GamepadEventKind {
-    Connected(DeviceId, Transport),
+    Connected(Uuid),
     Disconnected,
     ButtonChanged(GamepadButton, bool),
     AxisMoved(GamepadAxis, f32),
@@ -35,9 +33,6 @@ pub enum GamepadEventKind {
     /// Event produced when the user clicks the trackpad surface
     /// This is different from touching, because the user is physically pressing it in
     PointerClicked(GamepadPointer, bool),
-
-    UnknwonButtonChanged(u16, bool),
-    UnknownAxisMoved(u16, f32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

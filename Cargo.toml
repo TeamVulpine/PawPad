@@ -1,24 +1,40 @@
+[workspace]
+resolver = "3"
+members = [".", "convert_sdl"]
+
+[workspace.dependencies]
+pawpad = { path = ".", features = ["serde"] }
+hidapi = "2.6.6"
+pawkit-crockford = "0.1.23"
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.18"
+evdev = "0.13.2"
+anyhow = "1.0.102"
+serde_json = "1.0.149"
+uuid = "1.23.1"
+
 [package]
 name = "pawpad"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-hidapi = "2.6.6"
-pawkit-crockford = "0.1.23"
-serde = { version = "1.0.228", optional = true, features = ["derive"] }
-thiserror = "2.0.18"
+hidapi.workspace = true
+pawkit-crockford.workspace = true
+serde = { workspace = true, optional = true}
+thiserror.workspace = true
+uuid.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-evdev = "0.13.2"
+evdev.workspace = true
 
 [dev-dependencies]
-anyhow = "1.0.102"
-serde_json = "1.0.149"
-pawpad = { path = ".", features = ["serde"] }
+anyhow.workspace = true
+serde_json.workspace = true
+pawpad.workspace = true
 
 [features]
-serde = ["dep:serde"]
+serde = ["dep:serde", "uuid/serde"]
 
 [[example]]
 name = "simple"

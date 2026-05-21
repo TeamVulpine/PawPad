@@ -1,0 +1,3 @@
+[submodule "convert_sdl/SDL_GameControllerDB"]
+	path = convert_sdl/SDL_GameControllerDB
+	url = https://github.com/mdqinc/SDL_GameControllerDB.git
