@@ -13,8 +13,14 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    gamepad::{GamepadEvent, GamepadEventKind, GamepadId, button::{self, GamepadButton}},
-    mapping::{BakedGamepadMappings, hat::{HatButton, HatDescriptor, HatIndex}},
+    gamepad::{
+        GamepadEvent, GamepadEventKind, GamepadId,
+        button::{self, GamepadButton},
+    },
+    mapping::{
+        BakedGamepadMappings,
+        hat::{HatButton, HatDescriptor, HatIndex},
+    },
 };
 
 struct MappedDevice {
@@ -252,57 +258,78 @@ impl EvdevBackend {
 
                                 let mut was_hat = false;
 
-                                let mut handle_hat = |x: AbsoluteAxisCode, y: AbsoluteAxisCode, i: HatIndex| {
-                                    let value = ev.value();
+                                let mut handle_hat =
+                                    |x: AbsoluteAxisCode, y: AbsoluteAxisCode, i: HatIndex| {
+                                        let value = ev.value();
 
-                                    let hat_index = if code == x {
-                                        &mut device.hatx
-                                    } else if code == y {
-                                        &mut device.haty
-                                    } else {
-                                        return;
+                                        let hat_index = if code == x {
+                                            &mut device.hatx
+                                        } else if code == y {
+                                            &mut device.haty
+                                        } else {
+                                            return;
+                                        };
+
+                                        was_hat = true;
+
+                                        if let Some(button) = hat_index[i.to_index()] {
+                                            events.push(GamepadEvent {
+                                                id: GamepadId(*id),
+                                                timestamp: ev.timestamp(),
+                                                kind: GamepadEventKind::ButtonChanged(
+                                                    button, false,
+                                                ),
+                                            });
+                                        }
+
+                                        let button = if code == y && value == -1 {
+                                            HatButton::One
+                                        } else if code == y && value == 1 {
+                                            HatButton::Four
+                                        } else if code == x && value == -1 {
+                                            HatButton::Eight
+                                        } else if code == x && value == 1 {
+                                            HatButton::Two
+                                        } else {
+                                            hat_index[i.to_index()] = None;
+                                            return;
+                                        };
+
+                                        let descriptor = HatDescriptor(i, button);
+
+                                        if let Some(button) =
+                                            mappings.get_hat(device.device_id, descriptor)
+                                        {
+                                            events.push(GamepadEvent {
+                                                id: GamepadId(*id),
+                                                timestamp: ev.timestamp(),
+                                                kind: GamepadEventKind::ButtonChanged(button, true),
+                                            });
+
+                                            hat_index[i.to_index()] = Some(button);
+                                        }
                                     };
 
-                                    was_hat = true;
-                                    
-                                    if let Some(button) = hat_index[i.to_index()] {
-                                        events.push(GamepadEvent {
-                                            id: GamepadId(*id),
-                                            timestamp: ev.timestamp(),
-                                            kind: GamepadEventKind::ButtonChanged(button, false),
-                                        });
-                                    }
-                                    
-                                    let button = if code == y && value == -1 {
-                                        HatButton::One
-                                    } else if code == y && value == 1 {
-                                        HatButton::Four
-                                    } else if code == x && value == -1 {
-                                        HatButton::Eight
-                                    } else if code == x && value == 1 {
-                                        HatButton::Two
-                                    } else {
-                                        hat_index[i.to_index()] = None;
-                                        return;
-                                    };
-
-                                    let descriptor = HatDescriptor(i, button);
-
-                                    if let Some(button) = mappings.get_hat(device.device_id, descriptor) {
-                                        events.push(GamepadEvent {
-                                            id: GamepadId(*id),
-                                            timestamp: ev.timestamp(),
-                                            kind: GamepadEventKind::ButtonChanged(button, true),
-                                        });
-
-                                        hat_index[i.to_index()] = Some(button);
-                                    }
-                                };
-
-                                handle_hat(AbsoluteAxisCode::ABS_HAT0X, AbsoluteAxisCode::ABS_HAT0Y, HatIndex::Zero);
-                                handle_hat(AbsoluteAxisCode::ABS_HAT1X, AbsoluteAxisCode::ABS_HAT1Y, HatIndex::One);
-                                handle_hat(AbsoluteAxisCode::ABS_HAT2X, AbsoluteAxisCode::ABS_HAT2Y, HatIndex::Two);
-                                handle_hat(AbsoluteAxisCode::ABS_HAT3X, AbsoluteAxisCode::ABS_HAT3Y, HatIndex::Three);
+                                handle_hat(
+                                    AbsoluteAxisCode::ABS_HAT0X,
+                                    AbsoluteAxisCode::ABS_HAT0Y,
+                                    HatIndex::Zero,
+                                );
+                                handle_hat(
+                                    AbsoluteAxisCode::ABS_HAT1X,
+                                    AbsoluteAxisCode::ABS_HAT1Y,
+                                    HatIndex::One,
+                                );
+                                handle_hat(
+                                    AbsoluteAxisCode::ABS_HAT2X,
+                                    AbsoluteAxisCode::ABS_HAT2Y,
+                                    HatIndex::Two,
+                                );
+                                handle_hat(
+                                    AbsoluteAxisCode::ABS_HAT3X,
+                                    AbsoluteAxisCode::ABS_HAT3Y,
+                                    HatIndex::Three,
+                                );
 
                                 // if let Some(hat) = mappings.get_hat(device.device_id) {
                                 //     let hatx = AbsoluteAxisCode(
@@ -391,7 +418,7 @@ impl EvdevBackend {
                                         id: GamepadId(*id),
                                         timestamp: ev.timestamp(),
                                         kind: GamepadEventKind::AxisMoved(
-                                            axis,
+                                            axis.axis,
                                             axis.normalize(value),
                                         ),
                                     });
@@ -406,7 +433,7 @@ impl EvdevBackend {
                     events.push(GamepadEvent {
                         id: GamepadId(*id),
                         timestamp: SystemTime::now(),
-                        kind: GamepadEventKind::Disconnected
+                        kind: GamepadEventKind::Disconnected,
                     });
                     devices_to_remove.push(*id);
                 }

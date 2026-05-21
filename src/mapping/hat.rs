@@ -6,7 +6,7 @@ pub enum HatButton {
     One,
     Two,
     Four,
-    Eight
+    Eight,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -21,16 +21,16 @@ pub enum HatIndex {
 pub struct HatDescriptor(pub HatIndex, pub HatButton);
 
 impl HatButton {
-    fn to_char(&self) -> u8 {
+    pub fn to_char(&self) -> u8 {
         return match self {
             Self::One => b'1',
             Self::Two => b'2',
             Self::Four => b'4',
             Self::Eight => b'8',
-        }
+        };
     }
 
-    fn from_char(c: u8) -> Option<Self> {
+    pub fn from_char(c: u8) -> Option<Self> {
         match c {
             b'1' => return Some(Self::One),
             b'2' => return Some(Self::Two),
@@ -42,16 +42,16 @@ impl HatButton {
 }
 
 impl HatIndex {
-    fn to_char(&self) -> u8 {
+    pub fn to_char(&self) -> u8 {
         return match self {
             Self::Zero => b'0',
             Self::One => b'1',
             Self::Two => b'2',
             Self::Three => b'3',
-        }
+        };
     }
 
-    fn from_char(c: u8) -> Option<Self> {
+    pub fn from_char(c: u8) -> Option<Self> {
         match c {
             b'0' => return Some(Self::Zero),
             b'1' => return Some(Self::One),
@@ -75,7 +75,7 @@ impl HatIndex {
 impl Serialize for HatDescriptor {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer
+        S: serde::Serializer,
     {
         let bytes = [self.0.to_char(), b'.', self.1.to_char()];
 
@@ -95,7 +95,9 @@ impl<'de> Deserialize<'de> for HatDescriptor {
         let bytes = s.as_bytes();
 
         if bytes.len() != 3 || bytes[1] != b'.' {
-            return Err(serde::de::Error::custom("expected format \"<index>.<button>\""));
+            return Err(serde::de::Error::custom(
+                "expected format \"<index>.<button>\"",
+            ));
         }
 
         let index = HatIndex::from_char(bytes[0])

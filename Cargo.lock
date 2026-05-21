@@ -70,6 +70,7 @@ name = "convert_sdl"
 version = "0.1.0"
 dependencies = [
  "pawpad",
+ "serde_json",
  "uuid",
 ]
 

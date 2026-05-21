@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 uuid.workspace = true
 pawpad.workspace = true
+serde_json.workspace = true
