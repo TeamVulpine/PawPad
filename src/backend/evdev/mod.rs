@@ -209,6 +209,7 @@ impl EvdevBackend {
         }
 
         for (id, device) in &mut self.devices {
+            // TODO: Figure out how to merge events
             match device.device.fetch_events() {
                 Ok(evs) => {
                     for ev in evs {

@@ -1,3 +1,5 @@
+use std::{thread::sleep, time::Duration};
+
 use pawpad::PawPad;
 
 const MAPPINGS_FILE: &str = include_str!("pawpad_mappings.json");
@@ -9,7 +11,8 @@ fn main() -> anyhow::Result<()> {
 
     loop {
         for event in pawpad.poll_events()? {
-            println!("{:?}", event);
+            println!("{:?}", event.kind);
         }
+        sleep(Duration::from_secs(1));
     }
 }
