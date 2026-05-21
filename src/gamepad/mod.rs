@@ -35,6 +35,9 @@ pub enum GamepadEventKind {
     /// Event produced when the user clicks the trackpad surface
     /// This is different from touching, because the user is physically pressing it in
     PointerClicked(GamepadPointer, bool),
+
+    UnknwonButtonChanged(u16, bool),
+    UnknownAxisMoved(u16, f32),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

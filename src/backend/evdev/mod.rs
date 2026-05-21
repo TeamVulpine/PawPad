@@ -234,11 +234,19 @@ impl EvdevBackend {
                                         timestamp: ev.timestamp(),
                                         kind: GamepadEventKind::ButtonChanged(button, pressed),
                                     });
+                                } else {
+                                    events.push(GamepadEvent {
+                                        id: GamepadId(*id),
+                                        timestamp: ev.timestamp(),
+                                        kind: GamepadEventKind::UnknwonButtonChanged(scancode, pressed),
+                                    });
                                 }
                             }
                             EventType::ABSOLUTE => {
                                 let code_raw = ev.code();
                                 let code = AbsoluteAxisCode(code_raw);
+
+                                let mut was_hat = false;
 
                                 if let Some(hat) = mappings.get_hat(device.transport, device.device_id) {
                                     let hatx = AbsoluteAxisCode(AbsoluteAxisCode::ABS_HAT0X.0 + hat as u16 * 2);
@@ -272,6 +280,8 @@ impl EvdevBackend {
                                         }
 
                                         device.hatx = value;
+
+                                        was_hat = true;
                                     }
 
                                     if code == haty {
@@ -302,15 +312,10 @@ impl EvdevBackend {
                                         }
 
                                         device.haty = value;
-                                    }
 
-                                    match (code, hat) {
-                                        (AbsoluteAxisCode::ABS_HAT0X, 0) => {
-                                        }
-                                        _ => {}
+                                        was_hat = true;
                                     }
                                 }
-
 
                                 let Some((scancode, range)) =
                                     device.axis_mapping.get(&code).cloned()
@@ -334,9 +339,16 @@ impl EvdevBackend {
                                             axis.normalize(value),
                                         ),
                                     });
+                                } else if !was_hat {
+                                    events.push(GamepadEvent {
+                                        id: GamepadId(*id),
+                                        timestamp: ev.timestamp(),
+                                        kind: GamepadEventKind::UnknownAxisMoved(
+                                            scancode,
+                                            value,
+                                        ),
+                                    });
                                 }
-
-                                // println!("{:?}: {}, {}", id, scancode, ev.value());
                             }
                             _ => {}
                         }
