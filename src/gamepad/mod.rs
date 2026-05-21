@@ -1,7 +1,12 @@
-use std::time::Instant;
+use std::time::SystemTime;
 
-use crate::gamepad::{
-    axis::GamepadAxis, button::GamepadButton, pointer::GamepadPointer, sensor::GamepadSensor,
+use pawkit_crockford::Ulid;
+
+use crate::{
+    gamepad::{
+        axis::GamepadAxis, button::GamepadButton, pointer::GamepadPointer, sensor::GamepadSensor,
+    },
+    mapping::{Transport, device_id::DeviceId},
 };
 
 pub mod axis;
@@ -10,15 +15,15 @@ pub mod pointer;
 pub mod sensor;
 
 /// An ID for a gamepad.
-/// The ID is unique per gamepad, but if a gamepad is disconnected,
-/// the ID can be reused if a new one is connected.
+/// It is randomly generated when a gamepad is connected, per the ULID spec.
+/// See https://github.com/ulid/spec
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct GamepadId(u32);
+pub struct GamepadId(pub(crate) Ulid);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum GamepadEventKind {
-    Connected,
+    Connected(DeviceId, Transport),
     Disconnected,
     ButtonChanged(GamepadButton, bool),
     AxisMoved(GamepadAxis, f32),
@@ -35,6 +40,6 @@ pub enum GamepadEventKind {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GamepadEvent {
     pub id: GamepadId,
-    pub timestamp: Instant,
+    pub timestamp: SystemTime,
     pub kind: GamepadEventKind,
 }

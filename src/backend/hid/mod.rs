@@ -1,6 +1,6 @@
 use std::io;
 
-use hidapi::{HidApi, HidError, MAX_REPORT_DESCRIPTOR_SIZE};
+use hidapi::{HidApi, HidError};
 use thiserror::Error;
 
 use crate::backend::hid::report_descriptor::HidReportDescriptor;

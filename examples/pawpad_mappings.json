@@ -1,0 +1,51 @@
+{
+    "linux": {
+        "bluetooth": {
+            "2dc8:6006:0100": {
+                "name": "8BitDo Pro 2",
+                "buttons": {
+                    "0": "East",
+                    "1": "South",
+                    "2": "RightPaddle1",
+                    "3": "North",
+                    "4": "West",
+                    "5": "LeftPaddle1",
+                    "6": "LeftShoulder",
+                    "7": "RightShoulder",
+                    "10": "Back",
+                    "11": "Start",
+                    "12": "Guide",
+                    "13": "LeftStick",
+                    "14": "RightStick"
+                },
+                "axes": {
+                    "0": "LeftX",
+                    "1": "LeftY",
+                    "2": "RightX",
+                    "3": "RightY",
+                    "4": "RightTrigger",
+                    "5": "LeftTrigger"
+                },
+                "hat": 0
+            },
+            "045e:0b13:0523": {
+                "name": "Xbox Wireless Controller",
+                "buttons": {
+                    "0": "South",
+                    "1": "East",
+                    "3": "West",
+                    "4": "North",
+                    "6": "LeftShoulder",
+                    "7": "RightShoulder",
+                    "10": "Back",
+                    "11": "Start",
+                    "12": "Guide",
+                    "13": "LeftStick",
+                    "14": "RightStick",
+                    "15": "Misc1"
+                },
+                "hat": 0
+            }
+        }
+    }
+}

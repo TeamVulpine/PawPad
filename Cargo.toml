@@ -5,10 +5,20 @@ edition = "2024"
 
 [dependencies]
 hidapi = "2.6.6"
-serde.features = ["derive"]
-serde.optional = true
-serde.version = "1.0.228"
+pawkit-crockford = "0.1.23"
+serde = { version = "1.0.228", optional = true, features = ["derive"] }
 thiserror = "2.0.18"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+evdev = "0.13.2"
+
+[dev-dependencies]
+anyhow = "1.0.102"
+serde_json = "1.0.149"
+pawpad = { path = ".", features = ["serde"] }
 
 [features]
 serde = ["dep:serde"]
+
+[[example]]
+name = "simple"
