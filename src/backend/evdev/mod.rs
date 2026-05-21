@@ -1,22 +1,20 @@
 use std::{
     collections::{HashMap, HashSet},
-    fs::{self},
+    fs::{self, File},
     io,
     ops::RangeInclusive,
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::SystemTime,
 };
 
-use evdev::{AbsoluteAxisCode, Device, EventType, InputId, KeyCode};
+use evdev::{AbsoluteAxisCode, Device, EventType, KeyCode};
 use pawkit_crockford::Ulid;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    gamepad::{
-        GamepadEvent, GamepadEventKind, GamepadId,
-        button::{self, GamepadButton},
-    },
+    backend::guid::get_guid,
+    gamepad::{GamepadEvent, GamepadEventKind, GamepadId, button::GamepadButton},
     mapping::{
         BakedGamepadMappings,
         hat::{HatButton, HatDescriptor, HatIndex},
@@ -99,29 +97,6 @@ fn build_axis_mapping(
     return Ok(map);
 }
 
-fn get_uuid(input_id: InputId) -> Uuid {
-    let bus = (u32::from(input_id.bus_type().0)).to_be();
-    let vendor = input_id.vendor().to_be();
-    let product = input_id.product().to_be();
-    let version = input_id.version().to_be();
-
-    return Uuid::from_fields(
-        bus,
-        vendor,
-        0,
-        &[
-            (product >> 8) as u8,
-            product as u8,
-            0,
-            0,
-            (version >> 8) as u8,
-            version as u8,
-            0,
-            0,
-        ],
-    );
-}
-
 impl EvdevBackend {
     const PATH: &str = "/dev/input";
 
@@ -146,38 +121,36 @@ impl EvdevBackend {
                 continue;
             }
 
-            // Commented out for testing purposes
-            // This is the code that checks for hidraw devices
-            // let path = Path::new("/sys/class/input")
-            //     .join(file.file_name())
-            //     .join("device/device/hidraw");
+            let path = Path::new("/sys/class/input")
+                .join(file.file_name())
+                .join("device/device/hidraw");
 
-            // if path.exists() {
-            //     let Ok(read_dir) = fs::read_dir(path) else {
-            //         continue;
-            //     };
+            if path.exists() {
+                let Ok(read_dir) = fs::read_dir(path) else {
+                    continue;
+                };
 
-            //     let mut skip_gamepad = false;
+                let mut skip_gamepad = false;
 
-            //     for file in read_dir {
-            //         let Ok(file) = file else {
-            //             continue;
-            //         };
+                for file in read_dir {
+                    let Ok(file) = file else {
+                        continue;
+                    };
 
-            //         let path = Path::new("/dev").join(file.file_name());
+                    let path = Path::new("/dev").join(file.file_name());
 
-            //         match File::open(path) {
-            //             Ok(_) => {
-            //                 skip_gamepad = true;
-            //             }
-            //             _ => {}
-            //         }
-            //     }
+                    match File::open(path) {
+                        Ok(_) => {
+                            skip_gamepad = true;
+                        }
+                        _ => {}
+                    }
+                }
 
-            //     if skip_gamepad {
-            //         continue;
-            //     }
-            // }
+                if skip_gamepad {
+                    continue;
+                }
+            }
 
             let Ok(metadata) = file.metadata() else {
                 continue;
@@ -199,7 +172,18 @@ impl EvdevBackend {
                 continue;
             };
 
-            let uuid = get_uuid(device.input_id());
+            let input_id = device.input_id();
+
+            let uuid = get_guid(
+                input_id.bus_type().0,
+                input_id.vendor(),
+                input_id.product(),
+                input_id.version(),
+                None,
+                device.name(),
+                0,
+                0,
+            );
 
             let id = Ulid::new();
 
@@ -330,77 +314,6 @@ impl EvdevBackend {
                                     AbsoluteAxisCode::ABS_HAT3Y,
                                     HatIndex::Three,
                                 );
-
-                                // if let Some(hat) = mappings.get_hat(device.device_id) {
-                                //     let hatx = AbsoluteAxisCode(
-                                //         AbsoluteAxisCode::ABS_HAT0X.0 + hat as u16 * 2,
-                                //     );
-                                //     let haty = AbsoluteAxisCode(hatx.0 + 1);
-
-                                //     if code == hatx {
-                                //         let value = ev.value();
-
-                                //         if let Some(hat) = device.hatx {
-                                //             events.push(GamepadEvent {
-                                //                 id: GamepadId(*id),
-                                //                 timestamp: ev.timestamp(),
-                                //                 kind: GamepadEventKind::ButtonChanged(hat, false),
-                                //             });
-                                //         }
-
-                                //         let value = if value == -1 {
-                                //             Some(GamepadButton::DPadLeft)
-                                //         } else if value == 1 {
-                                //             Some(GamepadButton::DPadRight)
-                                //         } else {
-                                //             None
-                                //         };
-
-                                //         if let Some(hat) = value {
-                                //             events.push(GamepadEvent {
-                                //                 id: GamepadId(*id),
-                                //                 timestamp: ev.timestamp(),
-                                //                 kind: GamepadEventKind::ButtonChanged(hat, true),
-                                //             });
-                                //         }
-
-                                //         device.hatx = value;
-
-                                //         was_hat = true;
-                                //     }
-
-                                //     if code == haty {
-                                //         let value = ev.value();
-
-                                //         if let Some(hat) = device.haty {
-                                //             events.push(GamepadEvent {
-                                //                 id: GamepadId(*id),
-                                //                 timestamp: ev.timestamp(),
-                                //                 kind: GamepadEventKind::ButtonChanged(hat, false),
-                                //             });
-                                //         }
-
-                                //         let value = if value == -1 {
-                                //             Some(GamepadButton::DPadUp)
-                                //         } else if value == 1 {
-                                //             Some(GamepadButton::DPadDown)
-                                //         } else {
-                                //             None
-                                //         };
-
-                                //         if let Some(hat) = value {
-                                //             events.push(GamepadEvent {
-                                //                 id: GamepadId(*id),
-                                //                 timestamp: ev.timestamp(),
-                                //                 kind: GamepadEventKind::ButtonChanged(hat, true),
-                                //             });
-                                //         }
-
-                                //         device.haty = value;
-
-                                //         was_hat = true;
-                                //     }
-                                // }
 
                                 let Some((scancode, range)) =
                                     device.axis_mapping.get(&code).cloned()

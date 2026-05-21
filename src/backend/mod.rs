@@ -12,6 +12,7 @@ use crate::{
 
 #[cfg(target_os = "linux")]
 mod evdev;
+mod guid;
 mod hid;
 
 pub(crate) struct PawPadBackend {
@@ -45,7 +46,7 @@ impl PawPadBackend {
     }
 
     fn update(&mut self, mappings: &BakedGamepadMappings) -> Result<(), PawPadBackendError> {
-        // self.hid.update()?;
+        self.hid.update(&mut self.events)?;
 
         #[cfg(target_os = "linux")]
         self.evdev.update(&mut self.events, mappings)?;
