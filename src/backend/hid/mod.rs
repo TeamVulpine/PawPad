@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    ffi::{CStr, OsStr},
+    ffi::CStr,
     io,
     ops::Deref,
     path::PathBuf,
@@ -8,7 +8,7 @@ use std::{
 };
 
 use hidapi::{BusType, HidApi, HidDevice, HidError, MAX_REPORT_DESCRIPTOR_SIZE};
-use hidreport::ReportDescriptor;
+use hidreport::{Report, ReportDescriptor};
 use pawkit_crockford::Ulid;
 use thiserror::Error;
 use uuid::Uuid;
@@ -20,7 +20,7 @@ use crate::{
 
 struct Device {
     device: HidDevice,
-    report: ReportDescriptor,
+    report_descriptor: ReportDescriptor,
     uuid: Uuid,
 }
 
@@ -106,7 +106,7 @@ impl HidBackend {
 
             let device = Device {
                 device: device,
-                report: report_descriptor,
+                report_descriptor,
                 uuid,
             };
 
@@ -120,6 +120,31 @@ impl HidBackend {
                 timestamp: SystemTime::now(),
                 kind: GamepadEventKind::Connected(uuid),
             });
+        }
+
+        for (id, device) in &self.devices {
+            let mut buf = [0u8; MAX_REPORT_DESCRIPTOR_SIZE];
+
+            let read = match device.device.read_timeout(&mut buf, 0) {
+                Ok(read) => read,
+                Err(err) => {
+                    panic!("{:?}", err);
+                }
+            };
+
+            if read == 0 {
+                continue;
+            }
+
+            let buf = &buf[..read];
+
+            let Some(input_report) = device.report_descriptor.find_input_report(buf) else {
+                continue;
+            };
+
+            for (i, field) in input_report.fields().iter().enumerate() {
+                println!("{}: {:?}", i, field.bits());
+            }
         }
 
         return Ok(());

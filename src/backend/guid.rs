@@ -15,7 +15,6 @@
 ///
 /// Full license text:
 /// https://github.com/libsdl-org/SDL/blob/main/LICENSE.txt
-
 use uuid::Uuid;
 
 fn crc16(mut crc: u16, data: &[u8]) -> u16 {
@@ -30,7 +29,7 @@ fn crc16(mut crc: u16, data: &[u8]) -> u16 {
             }
         }
     }
-    return crc
+    return crc;
 }
 
 /// Gets the GUID of a device using the same method as SDL.
@@ -66,9 +65,9 @@ pub fn get_guid(
 
     if vendor != 0 {
         bytes[4..6].copy_from_slice(&vendor.to_le_bytes());
-        
+
         bytes[8..10].copy_from_slice(&product.to_le_bytes());
-        
+
         bytes[12..14].copy_from_slice(&version.to_le_bytes());
 
         bytes[14] = driver_signature;
