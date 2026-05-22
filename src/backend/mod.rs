@@ -46,7 +46,7 @@ impl PawPadBackend {
     }
 
     fn update(&mut self, mappings: &BakedGamepadMappings) -> Result<(), PawPadBackendError> {
-        self.hid.update(&mut self.events)?;
+        self.hid.update(&mut self.events, mappings)?;
 
         #[cfg(target_os = "linux")]
         self.evdev.update(&mut self.events, mappings)?;

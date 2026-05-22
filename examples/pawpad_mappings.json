@@ -55013,21 +55013,21 @@
     "03000000-c82d-0000-0960-000000000000": {
       "name": "8BitDo Pro 3",
       "buttons": {
-        "12": "Guide",
-        "4": "West",
+        "0": "East",
         "1": "South",
-        "10": "Back",
-        "14": "RightStick",
-        "17": "RightPaddle1",
-        "5": "LeftPaddle2",
         "2": "RightPaddle2",
-        "16": "LeftPaddle1",
         "3": "North",
+        "4": "West",
+        "5": "LeftPaddle2",
         "6": "LeftShoulder",
-        "11": "Start",
         "7": "RightShoulder",
+        "10": "Back",
+        "11": "Start",
+        "12": "Guide",
         "13": "LeftStick",
-        "0": "East"
+        "14": "RightStick",
+        "16": "LeftPaddle1",
+        "17": "RightPaddle1"
       },
       "axes": {
         "0": {

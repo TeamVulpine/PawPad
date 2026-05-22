@@ -97,6 +97,15 @@ fn build_axis_mapping(
     return Ok(map);
 }
 
+fn guess_button(keycode: KeyCode) -> Option<GamepadButton> {
+    match keycode {
+        _ => {
+            println!("(PawPad) EvdevBackend: Unexpected KeyCode: {:?}", keycode);
+            return None;
+        }
+    }
+}
+
 impl EvdevBackend {
     const PATH: &str = "/dev/input";
 
@@ -226,8 +235,9 @@ impl EvdevBackend {
 
                                 let pressed = ev.value() != 0;
 
-                                if let Some(button) =
-                                    mappings.get_button(device.device_id, scancode)
+                                if let Some(button) = mappings
+                                    .get_button(device.device_id, scancode)
+                                    .or_else(|| guess_button(code))
                                 {
                                     events.push(GamepadEvent {
                                         id: GamepadId(*id),
@@ -281,17 +291,17 @@ impl EvdevBackend {
 
                                         let descriptor = HatDescriptor(i, button);
 
-                                        if let Some(button) =
-                                            mappings.get_hat(device.device_id, descriptor)
-                                        {
-                                            events.push(GamepadEvent {
-                                                id: GamepadId(*id),
-                                                timestamp: ev.timestamp(),
-                                                kind: GamepadEventKind::ButtonChanged(button, true),
-                                            });
+                                        let button = mappings
+                                            .get_hat(device.device_id, descriptor)
+                                            .unwrap_or_else(|| descriptor.guess_button());
 
-                                            hat_index[i.to_index()] = Some(button);
-                                        }
+                                        events.push(GamepadEvent {
+                                            id: GamepadId(*id),
+                                            timestamp: ev.timestamp(),
+                                            kind: GamepadEventKind::ButtonChanged(button, true),
+                                        });
+
+                                        hat_index[i.to_index()] = Some(button);
                                     };
 
                                 handle_hat(
@@ -314,6 +324,10 @@ impl EvdevBackend {
                                     AbsoluteAxisCode::ABS_HAT3Y,
                                     HatIndex::Three,
                                 );
+
+                                if was_hat {
+                                    continue;
+                                }
 
                                 let Some((scancode, range)) =
                                     device.axis_mapping.get(&code).cloned()
@@ -342,7 +356,7 @@ impl EvdevBackend {
                     }
                 }
                 Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
-                Err(e) => {
+                Err(_) => {
                     events.push(GamepadEvent {
                         id: GamepadId(*id),
                         timestamp: SystemTime::now(),

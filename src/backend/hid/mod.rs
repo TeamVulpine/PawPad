@@ -7,20 +7,22 @@ use std::{
     time::SystemTime,
 };
 
-use hidapi::{BusType, HidApi, HidDevice, HidError, MAX_REPORT_DESCRIPTOR_SIZE};
-use hidreport::{Report, ReportDescriptor};
+use hidapi::{BusType, HidApi, HidDevice, HidError};
 use pawkit_crockford::Ulid;
 use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    backend::guid::get_guid,
+    backend::{guid::get_guid, hid::driver::HidDriver},
     gamepad::{GamepadEvent, GamepadEventKind, GamepadId},
+    mapping::BakedGamepadMappings,
 };
+
+mod driver;
 
 struct Device {
     device: HidDevice,
-    report_descriptor: ReportDescriptor,
+    driver: HidDriver,
     uuid: Uuid,
 }
 
@@ -36,8 +38,6 @@ pub enum HidBackendError {
     Hid(#[from] HidError),
     #[error(transparent)]
     Io(#[from] io::Error),
-    #[error(transparent)]
-    ReportDescriptor(#[from] hidreport::ParserError),
 }
 
 fn cstr_to_pathbuf(cstr: &CStr) -> PathBuf {
@@ -58,7 +58,11 @@ impl HidBackend {
         });
     }
 
-    pub fn update(&mut self, events: &mut Vec<GamepadEvent>) -> Result<(), HidBackendError> {
+    pub fn update(
+        &mut self,
+        events: &mut Vec<GamepadEvent>,
+        mappings: &BakedGamepadMappings,
+    ) -> Result<(), HidBackendError> {
         self.hid_api.refresh_devices()?;
 
         let devices = self.hid_api.device_list().filter(|it| {
@@ -77,13 +81,9 @@ impl HidBackend {
                 continue;
             };
 
-            let mut report_bytes = [0u8; MAX_REPORT_DESCRIPTOR_SIZE];
+            device.set_blocking_mode(false)?;
 
-            let len = device.get_report_descriptor(&mut report_bytes)?;
-
-            let report_bytes = &report_bytes[..len];
-
-            let report_descriptor = ReportDescriptor::try_from(report_bytes)?;
+            let driver = HidDriver::from(info.vendor_id(), info.product_id());
 
             let bus_type = match info.bus_type() {
                 BusType::Unknown => 0x00,
@@ -104,9 +104,13 @@ impl HidBackend {
                 0,
             );
 
+            println!("HID driver: {:?}", driver);
+
+            driver.init(&device);
+
             let device = Device {
-                device: device,
-                report_descriptor,
+                device,
+                driver,
                 uuid,
             };
 
@@ -122,29 +126,27 @@ impl HidBackend {
             });
         }
 
-        for (id, device) in &self.devices {
-            let mut buf = [0u8; MAX_REPORT_DESCRIPTOR_SIZE];
+        for (id, device) in &mut self.devices {
+            let mut buf = [0u8; 64];
+            let mut last_read = 0;
 
-            let read = match device.device.read_timeout(&mut buf, 0) {
-                Ok(read) => read,
-                Err(err) => {
-                    panic!("{:?}", err);
+            loop {
+                let read = device.device.read(&mut buf)?;
+
+                if read == 0 {
+                    break;
                 }
-            };
 
-            if read == 0 {
+                last_read = read;
+            }
+
+            if last_read == 0 {
                 continue;
             }
 
-            let buf = &buf[..read];
-
-            let Some(input_report) = device.report_descriptor.find_input_report(buf) else {
-                continue;
-            };
-
-            for (i, field) in input_report.fields().iter().enumerate() {
-                println!("{}: {:?}", i, field.bits());
-            }
+            device
+                .driver
+                .handle_state(&buf[..last_read], *id, device.uuid, events, mappings);
         }
 
         return Ok(());

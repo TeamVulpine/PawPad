@@ -192,22 +192,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hidreport"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bba4f2ebef8032ef0125a72c7052481c9d63e50f1d48d35c0933ae11aa58c6d"
-dependencies = [
- "hut",
- "thiserror",
-]
-
-[[package]]
-name = "hut"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c882ba3379c41a5713a111ea16bddf8d337c439630db6ec5f7ece7d1e7e29c5c"
-
-[[package]]
 name = "id-arena"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -300,9 +284,9 @@ name = "pawpad"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bitflags",
  "evdev",
  "hidapi",
- "hidreport",
  "pawkit-crockford",
  "pawpad",
  "serde",
@@ -424,9 +408,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.149"
+version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
 dependencies = [
  "itoa",
  "memchr",

@@ -1,6 +1,8 @@
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+use crate::gamepad::button::GamepadButton;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HatButton {
     One,
@@ -68,6 +70,17 @@ impl HatIndex {
             Self::Two => 2,
             Self::Three => 3,
         };
+    }
+}
+
+impl HatDescriptor {
+    pub(crate) fn guess_button(&self) -> GamepadButton {
+        match self.1 {
+            HatButton::One => GamepadButton::DPadUp,
+            HatButton::Two => GamepadButton::DPadRight,
+            HatButton::Four => GamepadButton::DPadDown,
+            HatButton::Eight => GamepadButton::DPadLeft,
+        }
     }
 }
 
