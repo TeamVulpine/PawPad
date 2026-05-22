@@ -2,7 +2,7 @@ use hidapi::HidDevice;
 use pawkit_crockford::Ulid;
 use uuid::Uuid;
 
-use crate::{backend::hid::HidBackendError, gamepad::GamepadEvent, mapping::BakedGamepadMappings};
+use crate::{gamepad::GamepadEvent, mapping::BakedGamepadMappings};
 
 #[derive(Debug)]
 pub struct UnknwonDriver {
@@ -12,6 +12,10 @@ pub struct UnknwonDriver {
 
 impl UnknwonDriver {
     pub fn new(vendor: u16, product: u16) -> Self {
+        println!(
+            "(PawPad) HID: Unknown vendor / product! {} / {}",
+            vendor, product
+        );
         return Self { vendor, product };
     }
 
