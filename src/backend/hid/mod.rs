@@ -13,7 +13,10 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    backend::{guid::{alternative_guid, get_guid}, hid::driver::HidDriver},
+    backend::{
+        guid::{alternative_guid, get_guid},
+        hid::driver::HidDriver,
+    },
     gamepad::{GamepadEvent, GamepadEventKind, GamepadId},
     mapping::BakedGamepadMappings,
 };
@@ -107,8 +110,6 @@ impl HidBackend {
 
             let alternative_uuid = alternative_guid(uuid);
 
-            println!("HID driver: {:?}", driver);
-
             driver.init(&device);
 
             let device = Device {
@@ -148,9 +149,14 @@ impl HidBackend {
                 continue;
             }
 
-            device
-                .driver
-                .handle_state(&buf[..last_read], *id, device.uuid, device.alternative_uuid, events, mappings);
+            device.driver.handle_state(
+                &buf[..last_read],
+                *id,
+                device.uuid,
+                device.alternative_uuid,
+                events,
+                mappings,
+            );
         }
 
         return Ok(());

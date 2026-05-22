@@ -3,9 +3,7 @@ use pawkit_crockford::Ulid;
 use uuid::Uuid;
 
 use crate::{
-    backend::hid::{
-        driver::{eightbitdo::EightBitDoDriver, unknown::UnknwonDriver},
-    },
+    backend::hid::driver::{eightbitdo::EightBitDoDriver, unknown::UnknwonDriver},
     gamepad::GamepadEvent,
     mapping::BakedGamepadMappings,
 };
@@ -45,8 +43,12 @@ impl HidDriver {
         mappings: &BakedGamepadMappings,
     ) {
         match self {
-            Self::EightBitDo(driver) => driver.handle_state(packet, id, uuid, alternative_uuid, events, mappings),
-            Self::Unknown(driver) => driver.handle_state(packet, id, uuid, alternative_uuid, events, mappings),
+            Self::EightBitDo(driver) => {
+                driver.handle_state(packet, id, uuid, alternative_uuid, events, mappings)
+            }
+            Self::Unknown(driver) => {
+                driver.handle_state(packet, id, uuid, alternative_uuid, events, mappings)
+            }
         }
     }
 }

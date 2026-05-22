@@ -14,9 +14,12 @@ use uuid::Uuid;
 
 use crate::{
     backend::guid::{alternative_guid, get_guid},
-    gamepad::{GamepadEvent, GamepadEventKind, GamepadId, axis::GamepadAxis, button::GamepadButton},
+    gamepad::{
+        GamepadEvent, GamepadEventKind, GamepadId, axis::GamepadAxis, button::GamepadButton,
+    },
     mapping::{
-        AxisMapping, BakedGamepadMappings, hat::{HatButton, HatDescriptor, HatIndex}
+        AxisMapping, BakedGamepadMappings,
+        hat::{HatButton, HatDescriptor, HatIndex},
     },
 };
 
@@ -122,7 +125,7 @@ fn guess_button(keycode: KeyCode) -> Option<GamepadButton> {
 
         _ => {
             println!("(PawPad) EvdevBackend: Unexpected KeyCode: {:?}", keycode);
-            
+
             None
         }
     }
@@ -140,8 +143,11 @@ fn guess_axis(axis: AbsoluteAxisCode) -> Option<AxisMapping> {
         AbsoluteAxisCode::ABS_GAS => Some(AxisMapping::of_axis(GamepadAxis::RightTrigger)),
 
         _ => {
-            println!("(PawPad) EvdevBackend: Unexpected AbsoluteAxisCode: {:?}", axis);
-            
+            println!(
+                "(PawPad) EvdevBackend: Unexpected AbsoluteAxisCode: {:?}",
+                axis
+            );
+
             None
         }
     }
@@ -236,8 +242,6 @@ impl EvdevBackend {
             );
 
             let alternative_uuid = alternative_guid(uuid);
-
-            println!("{}", alternative_uuid);
 
             let id = Ulid::new();
 
@@ -338,7 +342,11 @@ impl EvdevBackend {
                                         let descriptor = HatDescriptor(i, button);
 
                                         let button = mappings
-                                            .get_hat(device.uuid, device.alternative_uuid, descriptor)
+                                            .get_hat(
+                                                device.uuid,
+                                                device.alternative_uuid,
+                                                descriptor,
+                                            )
                                             .unwrap_or_else(|| descriptor.guess_button());
 
                                         events.push(GamepadEvent {
@@ -386,7 +394,10 @@ impl EvdevBackend {
 
                                 let value = (ev.value() as f32 - min) / (max - min);
 
-                                if let Some(axis) = mappings.get_axis(device.uuid, device.alternative_uuid, scancode).or_else(|| guess_axis(code)) {
+                                if let Some(axis) = mappings
+                                    .get_axis(device.uuid, device.alternative_uuid, scancode)
+                                    .or_else(|| guess_axis(code))
+                                {
                                     events.push(GamepadEvent {
                                         id: GamepadId(*id),
                                         timestamp: ev.timestamp(),

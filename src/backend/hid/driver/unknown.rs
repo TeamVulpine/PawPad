@@ -19,12 +19,12 @@ impl UnknwonDriver {
 
     pub fn handle_state(
         &self,
-        state: &[u8],
-        id: Ulid,
-        uuid: Uuid,
-        alternative_uuid: Uuid,
-        events: &mut Vec<GamepadEvent>,
-        mappings: &BakedGamepadMappings,
+        _state: &[u8],
+        _id: Ulid,
+        _uuid: Uuid,
+        _alternative_uuid: Uuid,
+        _events: &mut Vec<GamepadEvent>,
+        _mappings: &BakedGamepadMappings,
     ) {
     }
 }

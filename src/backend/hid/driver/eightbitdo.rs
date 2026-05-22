@@ -1,18 +1,27 @@
 use std::time::SystemTime;
 
+use bitflags::bitflags;
 use hidapi::HidDevice;
 use pawkit_crockford::Ulid;
 use uuid::Uuid;
 
 use crate::{
-    gamepad::{GamepadEvent, GamepadEventKind, GamepadId, button::GamepadButton},
-    mapping::BakedGamepadMappings,
+    gamepad::{
+        GamepadEvent, GamepadEventKind, GamepadId, axis::GamepadAxis, button::GamepadButton,
+    },
+    mapping::{
+        AxisMapping, BakedGamepadMappings,
+        hat::{HatButton, HatDescriptor, HatIndex},
+    },
 };
 
 #[derive(Debug)]
+#[allow(unused)]
 pub struct EightBitDoDriver {
     product: Product,
     last_button: u32,
+    last_hat: HatMask,
+    last_axes: [u8; 6],
 }
 
 #[derive(Debug)]
@@ -22,12 +31,77 @@ enum Transport {
 }
 
 #[derive(Debug)]
-pub enum Product {
+#[allow(unused)]
+enum Product {
     Sn30Pro(Transport),
     Pro2(Transport),
     Pro3,
     Ultimate2,
     Unknown,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeviceHat {
+    Up = 0,
+    RightUp = 1,
+    Right = 2,
+    RightDown = 3,
+    Down = 4,
+    LeftDown = 5,
+    Left = 6,
+    LeftUp = 7,
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct HatMask: u8 {
+        const UP = 1 << 0;
+        const RIGHT = 1 << 1;
+        const DOWN = 1 << 2;
+        const LEFT = 1 << 3;
+    }
+}
+
+impl DeviceHat {
+    pub fn from_device(index: u8) -> Option<Self> {
+        return match index {
+            0 => Some(Self::Up),
+            1 => Some(Self::RightUp),
+            2 => Some(Self::Right),
+            3 => Some(Self::RightDown),
+            4 => Some(Self::Down),
+            5 => Some(Self::LeftDown),
+            6 => Some(Self::Left),
+            7 => Some(Self::LeftUp),
+            _ => None,
+        };
+    }
+
+    pub fn to_mask(self) -> HatMask {
+        return match self {
+            Self::Up => HatMask::UP,
+            Self::RightUp => HatMask::UP | HatMask::RIGHT,
+            Self::Right => HatMask::RIGHT,
+            Self::RightDown => HatMask::RIGHT | HatMask::DOWN,
+            Self::Down => HatMask::DOWN,
+            Self::LeftDown => HatMask::DOWN | HatMask::LEFT,
+            Self::Left => HatMask::LEFT,
+            Self::LeftUp => HatMask::LEFT | HatMask::UP,
+        };
+    }
+}
+
+impl HatMask {
+    pub fn iter_buttons(self) -> impl Iterator<Item = (HatMask, HatButton)> {
+        return [
+            (HatMask::UP, HatButton::One),
+            (HatMask::RIGHT, HatButton::Two),
+            (HatMask::DOWN, HatButton::Four),
+            (HatMask::LEFT, HatButton::Eight),
+        ]
+        .into_iter()
+        .filter(move |(mask, _)| self.contains(*mask));
+    }
 }
 
 impl EightBitDoDriver {
@@ -58,10 +132,12 @@ impl EightBitDoDriver {
         return Some(Self {
             product,
             last_button: 0,
+            last_hat: HatMask::empty(),
+            last_axes: [127, 127, 127, 127, 0, 0],
         });
     }
 
-    pub fn init(&self, device: &HidDevice) {}
+    pub fn init(&self, _device: &HidDevice) {}
 
     pub fn handle_state(
         &mut self,
@@ -74,23 +150,51 @@ impl EightBitDoDriver {
     ) {
         let timestamp = SystemTime::now();
 
-        // match state[1] {
-        //     0 => println!("up"),
-        //     1 => println!("right + up"),
-        //     2 => println!("right"),
-        //     3 => println!("right + down"),
-        //     4 => println!("down"),
-        //     5 => println!("left + down"),
-        //     6 => println!("left"),
-        //     7 => println!("left + up"),
-        //     _ => println!("centered")
-        // }
-        // println!("{:}", state[2]);
-        // println!("{:}", state[3]);
-        // println!("{:}", state[4]);
-        // println!("{:}", state[5]);
-        // println!("{:}", state[6]);
-        // println!("{:}", state[7]);
+        let hat = DeviceHat::from_device(state[1])
+            .map(DeviceHat::to_mask)
+            .unwrap_or(HatMask::empty());
+
+        if hat != self.last_hat {
+            let changed = hat.symmetric_difference(self.last_hat);
+
+            for (index, button) in changed.iter_buttons() {
+                let descriptor = HatDescriptor(HatIndex::Zero, button);
+                let button = mappings
+                    .get_hat(uuid, alternative_uuid, descriptor)
+                    .unwrap_or_else(|| descriptor.guess_button());
+
+                events.push(GamepadEvent {
+                    id: GamepadId(id),
+                    timestamp,
+                    kind: GamepadEventKind::ButtonChanged(button, hat.contains(index)),
+                });
+            }
+
+            self.last_hat = hat;
+        }
+
+        for i in 0..6 {
+            let byte = state[i + 2];
+
+            if self.last_axes[i] == byte {
+                continue;
+            }
+
+            self.last_axes[i] = byte;
+
+            let value = byte as f32 / u8::MAX as f32;
+
+            if let Some(axis) = mappings
+                .get_axis(uuid, alternative_uuid, i as u16)
+                .or_else(|| guess_axis(i as u16))
+            {
+                events.push(GamepadEvent {
+                    id: GamepadId(id),
+                    timestamp,
+                    kind: GamepadEventKind::AxisMoved(axis.axis, axis.normalize(value)),
+                });
+            }
+        }
 
         let mut button_mask = state[8] as u32;
 
@@ -114,7 +218,10 @@ impl EightBitDoDriver {
 
                 let new_value = button_mask & index != 0;
 
-                if let Some(button) = mappings.get_button(uuid, alternative_uuid, bit).or_else(|| guess_button(bit)) {
+                if let Some(button) = mappings
+                    .get_button(uuid, alternative_uuid, bit)
+                    .or_else(|| guess_button(bit))
+                {
                     events.push(GamepadEvent {
                         id: GamepadId(id),
                         timestamp,
@@ -128,23 +235,35 @@ impl EightBitDoDriver {
     }
 }
 
+fn guess_axis(scancode: u16) -> Option<AxisMapping> {
+    return match scancode {
+        0 => Some(AxisMapping::of_axis(GamepadAxis::LeftX)),
+        1 => Some(AxisMapping::of_axis(GamepadAxis::LeftY)),
+        2 => Some(AxisMapping::of_axis(GamepadAxis::RightX)),
+        3 => Some(AxisMapping::of_axis(GamepadAxis::RightY)),
+        4 => Some(AxisMapping::of_axis(GamepadAxis::RightTrigger)),
+        5 => Some(AxisMapping::of_axis(GamepadAxis::LeftTrigger)),
+        _ => None,
+    };
+}
+
 fn guess_button(scancode: u16) -> Option<GamepadButton> {
-    match scancode {
-        0 => return Some(GamepadButton::East),
-        1 => return Some(GamepadButton::South),
-        2 => return Some(GamepadButton::RightPaddle2),
-        3 => return Some(GamepadButton::North),
-        4 => return Some(GamepadButton::West),
-        5 => return Some(GamepadButton::LeftPaddle2),
-        6 => return Some(GamepadButton::LeftShoulder),
-        7 => return Some(GamepadButton::RightShoulder),
-        10 => return Some(GamepadButton::Back),
-        11 => return Some(GamepadButton::Start),
-        12 => return Some(GamepadButton::Guide),
-        13 => return Some(GamepadButton::LeftStick),
-        14 => return Some(GamepadButton::RightStick),
-        16 => return Some(GamepadButton::LeftPaddle1),
-        17 => return Some(GamepadButton::RightPaddle1),
-        _ => return None,
-    }
+    return match scancode {
+        0 => Some(GamepadButton::East),
+        1 => Some(GamepadButton::South),
+        2 => Some(GamepadButton::RightPaddle2),
+        3 => Some(GamepadButton::North),
+        4 => Some(GamepadButton::West),
+        5 => Some(GamepadButton::LeftPaddle2),
+        6 => Some(GamepadButton::LeftShoulder),
+        7 => Some(GamepadButton::RightShoulder),
+        10 => Some(GamepadButton::Back),
+        11 => Some(GamepadButton::Start),
+        12 => Some(GamepadButton::Guide),
+        13 => Some(GamepadButton::LeftStick),
+        14 => Some(GamepadButton::RightStick),
+        16 => Some(GamepadButton::LeftPaddle1),
+        17 => Some(GamepadButton::RightPaddle1),
+        _ => None,
+    };
 }
