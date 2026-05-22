@@ -4,7 +4,6 @@ use uuid::Uuid;
 
 use crate::{
     backend::hid::{
-        HidBackendError,
         driver::{eightbitdo::EightBitDoDriver, unknown::UnknwonDriver},
     },
     gamepad::GamepadEvent,
@@ -41,12 +40,13 @@ impl HidDriver {
         packet: &[u8],
         id: Ulid,
         uuid: Uuid,
+        alternative_uuid: Uuid,
         events: &mut Vec<GamepadEvent>,
         mappings: &BakedGamepadMappings,
     ) {
         match self {
-            Self::EightBitDo(driver) => driver.handle_state(packet, id, uuid, events, mappings),
-            Self::Unknown(driver) => driver.handle_state(packet, id, uuid, events, mappings),
+            Self::EightBitDo(driver) => driver.handle_state(packet, id, uuid, alternative_uuid, events, mappings),
+            Self::Unknown(driver) => driver.handle_state(packet, id, uuid, alternative_uuid, events, mappings),
         }
     }
 }

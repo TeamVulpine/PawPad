@@ -91,3 +91,13 @@ pub fn get_guid(
 
     return Uuid::from_bytes(bytes);
 }
+
+pub fn alternative_guid(base: Uuid) -> Uuid {
+    let mut bytes = base.into_bytes();
+
+    bytes[13] = 1;
+
+    bytes[2..4].fill(0);
+
+    return Uuid::from_bytes(bytes);
+}

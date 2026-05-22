@@ -22,6 +22,7 @@ impl UnknwonDriver {
         state: &[u8],
         id: Ulid,
         uuid: Uuid,
+        alternative_uuid: Uuid,
         events: &mut Vec<GamepadEvent>,
         mappings: &BakedGamepadMappings,
     ) {

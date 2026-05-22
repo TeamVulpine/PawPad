@@ -68,6 +68,7 @@ impl EightBitDoDriver {
         state: &[u8],
         id: Ulid,
         uuid: Uuid,
+        alternative_uuid: Uuid,
         events: &mut Vec<GamepadEvent>,
         mappings: &BakedGamepadMappings,
     ) {
@@ -113,7 +114,7 @@ impl EightBitDoDriver {
 
                 let new_value = button_mask & index != 0;
 
-                if let Some(button) = mappings.get_button(uuid, bit).or_else(|| guess_button(bit)) {
+                if let Some(button) = mappings.get_button(uuid, alternative_uuid, bit).or_else(|| guess_button(bit)) {
                     events.push(GamepadEvent {
                         id: GamepadId(id),
                         timestamp,

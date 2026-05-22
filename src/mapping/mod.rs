@@ -44,6 +44,13 @@ pub struct GamepadMappings {
 }
 
 impl AxisMapping {
+    pub fn of_axis(axis: GamepadAxis) -> Self {
+        return Self {
+            axis,
+            invert: false,
+        }
+    }
+
     pub fn normalize(&self, mut value: f32) -> f32 {
         if self.invert {
             value *= -1.;
@@ -112,15 +119,15 @@ pub(crate) struct BakedGamepadMappings {
 }
 
 impl BakedGamepadMappings {
-    pub fn get_button(&self, device_id: Uuid, index: u16) -> Option<GamepadButton> {
-        return self.buttons.get(&(device_id, index)).cloned();
+    pub fn get_button(&self, uuid: Uuid, alternative_uuid: Uuid, index: u16) -> Option<GamepadButton> {
+        return self.buttons.get(&(uuid, index)).or_else(|| self.buttons.get(&(alternative_uuid, index))).cloned();
     }
 
-    pub fn get_axis(&self, device_id: Uuid, index: u16) -> Option<AxisMapping> {
-        return self.axes.get(&(device_id, index)).cloned();
+    pub fn get_axis(&self, uuid: Uuid, alternative_uuid: Uuid, index: u16) -> Option<AxisMapping> {
+        return self.axes.get(&(uuid, index)).or_else(|| self.axes.get(&(alternative_uuid, index))).cloned();
     }
 
-    pub fn get_hat(&self, device_id: Uuid, descriptor: HatDescriptor) -> Option<GamepadButton> {
-        return self.hats.get(&(device_id, descriptor)).cloned();
+    pub fn get_hat(&self, uuid: Uuid, alternative_uuid: Uuid, descriptor: HatDescriptor) -> Option<GamepadButton> {
+        return self.hats.get(&(uuid, descriptor)).or_else(|| self.hats.get(&(alternative_uuid, descriptor))).cloned();
     }
 }

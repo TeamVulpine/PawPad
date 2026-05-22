@@ -13,18 +13,18 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    backend::guid::get_guid,
-    gamepad::{GamepadEvent, GamepadEventKind, GamepadId, button::GamepadButton},
+    backend::guid::{alternative_guid, get_guid},
+    gamepad::{GamepadEvent, GamepadEventKind, GamepadId, axis::GamepadAxis, button::GamepadButton},
     mapping::{
-        BakedGamepadMappings,
-        hat::{HatButton, HatDescriptor, HatIndex},
+        AxisMapping, BakedGamepadMappings, hat::{HatButton, HatDescriptor, HatIndex}
     },
 };
 
 struct MappedDevice {
     device: Device,
     path: PathBuf,
-    device_id: Uuid,
+    uuid: Uuid,
+    alternative_uuid: Uuid,
     keycode_mapping: HashMap<KeyCode, u16>,
     axis_mapping: HashMap<AbsoluteAxisCode, (u16, RangeInclusive<f32>)>,
     hatx: [Option<GamepadButton>; 4],
@@ -98,10 +98,51 @@ fn build_axis_mapping(
 }
 
 fn guess_button(keycode: KeyCode) -> Option<GamepadButton> {
+    // Reference: Xbox Series S controller
     match keycode {
+        KeyCode::BTN_SOUTH => Some(GamepadButton::South),
+        KeyCode::BTN_EAST => Some(GamepadButton::East),
+        KeyCode::BTN_WEST => Some(GamepadButton::North),
+        KeyCode::BTN_NORTH => Some(GamepadButton::West),
+
+        KeyCode::BTN_SELECT => Some(GamepadButton::Back),
+        KeyCode::BTN_START => Some(GamepadButton::Start),
+        KeyCode::BTN_MODE => Some(GamepadButton::Guide),
+
+        KeyCode::BTN_THUMBL => Some(GamepadButton::LeftStick),
+        KeyCode::BTN_THUMBR => Some(GamepadButton::RightStick),
+
+        KeyCode::BTN_TL => Some(GamepadButton::LeftShoulder),
+        KeyCode::BTN_TR => Some(GamepadButton::RightShoulder),
+
+        KeyCode::BTN_C => Some(GamepadButton::RightPaddle2),
+        KeyCode::BTN_Z => Some(GamepadButton::LeftPaddle2),
+
+        KeyCode::KEY_RECORD | KeyCode::BTN_TL2 | KeyCode::BTN_TR2 => None,
+
         _ => {
             println!("(PawPad) EvdevBackend: Unexpected KeyCode: {:?}", keycode);
-            return None;
+            
+            None
+        }
+    }
+}
+
+fn guess_axis(axis: AbsoluteAxisCode) -> Option<AxisMapping> {
+    // Reference: Xbox Series S controller
+    match axis {
+        AbsoluteAxisCode::ABS_X => Some(AxisMapping::of_axis(GamepadAxis::LeftX)),
+        AbsoluteAxisCode::ABS_Y => Some(AxisMapping::of_axis(GamepadAxis::LeftY)),
+        AbsoluteAxisCode::ABS_Z => Some(AxisMapping::of_axis(GamepadAxis::RightX)),
+        AbsoluteAxisCode::ABS_RZ => Some(AxisMapping::of_axis(GamepadAxis::RightY)),
+
+        AbsoluteAxisCode::ABS_BRAKE => Some(AxisMapping::of_axis(GamepadAxis::LeftTrigger)),
+        AbsoluteAxisCode::ABS_GAS => Some(AxisMapping::of_axis(GamepadAxis::RightTrigger)),
+
+        _ => {
+            println!("(PawPad) EvdevBackend: Unexpected AbsoluteAxisCode: {:?}", axis);
+            
+            None
         }
     }
 }
@@ -194,13 +235,18 @@ impl EvdevBackend {
                 0,
             );
 
+            let alternative_uuid = alternative_guid(uuid);
+
+            println!("{}", alternative_uuid);
+
             let id = Ulid::new();
 
             let mapped = MappedDevice {
                 keycode_mapping: build_keycode_mapping(&device),
                 axis_mapping: build_axis_mapping(&device)?,
                 device,
-                device_id: uuid,
+                uuid,
+                alternative_uuid,
                 path: file.path(),
                 hatx: [None; 4],
                 haty: [None; 4],
@@ -236,7 +282,7 @@ impl EvdevBackend {
                                 let pressed = ev.value() != 0;
 
                                 if let Some(button) = mappings
-                                    .get_button(device.device_id, scancode)
+                                    .get_button(device.uuid, device.alternative_uuid, scancode)
                                     .or_else(|| guess_button(code))
                                 {
                                     events.push(GamepadEvent {
@@ -292,7 +338,7 @@ impl EvdevBackend {
                                         let descriptor = HatDescriptor(i, button);
 
                                         let button = mappings
-                                            .get_hat(device.device_id, descriptor)
+                                            .get_hat(device.uuid, device.alternative_uuid, descriptor)
                                             .unwrap_or_else(|| descriptor.guess_button());
 
                                         events.push(GamepadEvent {
@@ -340,7 +386,7 @@ impl EvdevBackend {
 
                                 let value = (ev.value() as f32 - min) / (max - min);
 
-                                if let Some(axis) = mappings.get_axis(device.device_id, scancode) {
+                                if let Some(axis) = mappings.get_axis(device.uuid, device.alternative_uuid, scancode).or_else(|| guess_axis(code)) {
                                     events.push(GamepadEvent {
                                         id: GamepadId(*id),
                                         timestamp: ev.timestamp(),

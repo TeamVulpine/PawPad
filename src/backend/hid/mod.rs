@@ -13,7 +13,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-    backend::{guid::get_guid, hid::driver::HidDriver},
+    backend::{guid::{alternative_guid, get_guid}, hid::driver::HidDriver},
     gamepad::{GamepadEvent, GamepadEventKind, GamepadId},
     mapping::BakedGamepadMappings,
 };
@@ -24,6 +24,7 @@ struct Device {
     device: HidDevice,
     driver: HidDriver,
     uuid: Uuid,
+    alternative_uuid: Uuid,
 }
 
 pub(super) struct HidBackend {
@@ -104,6 +105,8 @@ impl HidBackend {
                 0,
             );
 
+            let alternative_uuid = alternative_guid(uuid);
+
             println!("HID driver: {:?}", driver);
 
             driver.init(&device);
@@ -112,6 +115,7 @@ impl HidBackend {
                 device,
                 driver,
                 uuid,
+                alternative_uuid,
             };
 
             let id = Ulid::new();
@@ -146,7 +150,7 @@ impl HidBackend {
 
             device
                 .driver
-                .handle_state(&buf[..last_read], *id, device.uuid, events, mappings);
+                .handle_state(&buf[..last_read], *id, device.uuid, device.alternative_uuid, events, mappings);
         }
 
         return Ok(());
