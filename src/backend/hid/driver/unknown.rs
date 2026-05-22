@@ -13,7 +13,7 @@ pub struct UnknwonDriver {
 impl UnknwonDriver {
     pub fn new(vendor: u16, product: u16) -> Self {
         println!(
-            "(PawPad) HID: Unknown vendor / product! {} / {}",
+            "(PawPad) HID: Unknown vendor / product! {:04x} / {:04x}",
             vendor, product
         );
         return Self { vendor, product };

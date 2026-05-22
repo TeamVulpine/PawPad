@@ -26,6 +26,7 @@ mod driver;
 struct Device {
     device: HidDevice,
     driver: HidDriver,
+    path: PathBuf,
     uuid: Uuid,
     alternative_uuid: Uuid,
 }
@@ -117,6 +118,7 @@ impl HidBackend {
                 driver,
                 uuid,
                 alternative_uuid,
+                path: path.clone(),
             };
 
             let id = Ulid::new();
@@ -131,12 +133,18 @@ impl HidBackend {
             });
         }
 
+        let mut devices_to_remove = Vec::new();
+
         for (id, device) in &mut self.devices {
             let mut buf = [0u8; 64];
             let mut last_read = 0;
 
             loop {
-                let read = device.device.read(&mut buf)?;
+                let Ok(read) = device.device.read(&mut buf) else {
+                    last_read = 0;
+                    devices_to_remove.push(*id);
+                    break;
+                };
 
                 if read == 0 {
                     break;
@@ -157,6 +165,15 @@ impl HidBackend {
                 events,
                 mappings,
             );
+        }
+
+        for id in devices_to_remove {
+            let Some(device) = self.devices.remove(&id) else {
+                continue;
+            };
+            self.device_paths.remove(&device.path);
+
+            events.push(GamepadEvent { id: GamepadId(id), timestamp: SystemTime::now(), kind: GamepadEventKind::Disconnected });
         }
 
         return Ok(());
