@@ -1,3 +1,3 @@
 # PawPad
 
-PawPad is an HID gamepad library for Rust.
+PawPad is an Feature rich, cross platform gamepad input API for Rust.
